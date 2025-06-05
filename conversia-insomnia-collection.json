@@ -1,0 +1,147 @@
+{
+  "_type": "export",
+  "__export_format": 4,
+  "__export_date": "2025-06-02T21:34:00.000Z",
+  "__export_source": "insomnia:8.4.0",
+  "resources": [
+    {
+      "_id": "wrk_conversia",
+      "_type": "workspace",
+      "name": "Conversia",
+      "description": "Testes para a API Conversia",
+      "scope": "collection"
+    },
+    {
+      "_id": "env_dev",
+      "_type": "environment",
+      "name": "Dev",
+      "parentId": "wrk_conversia",
+      "data": {
+        "base_url": "http://localhost:8080",
+        "huggingface_api_key": "your-huggingface-api-key",
+        "tenant_id": "1",
+        "bot_id": "1"
+      }
+    },
+    {
+      "_id": "fld_tenant",
+      "_type": "request_group",
+      "parentId": "wrk_conversia",
+      "name": "Tenant"
+    },
+    {
+      "_id": "req_create_tenant",
+      "_type": "request",
+      "parentId": "fld_tenant",
+      "method": "POST",
+      "url": "{{ _.base_url }}/api/tenants",
+      "name": "Create Tenant",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\"nome\":\"Empresa Teste\",\"cnpj\":\"12.345.678/0001-99\",\"email\":\"contato@empresateste.com\"}"
+      },
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ]
+    },
+    {
+      "_id": "req_list_tenants",
+      "_type": "request",
+      "parentId": "fld_tenant",
+      "method": "GET",
+      "url": "{{ _.base_url }}/api/tenants",
+      "name": "List Tenants",
+      "body": {},
+      "headers": []
+    },
+    {
+      "_id": "fld_bot",
+      "_type": "request_group",
+      "parentId": "wrk_conversia",
+      "name": "Bot"
+    },
+    {
+      "_id": "req_create_bot",
+      "_type": "request",
+      "parentId": "fld_bot",
+      "method": "POST",
+      "url": "{{ _.base_url }}/api/bots",
+      "name": "Create Bot",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\"nome\":\"Bot Teste\",\"modeloHuggingFace\":\"gpt2\",\"apiKey\":\"{{ _.huggingface_api_key }}\",\"tenantId\":{{ _.tenant_id }}}"
+      },
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ]
+    },
+    {
+      "_id": "req_list_bots",
+      "_type": "request",
+      "parentId": "fld_bot",
+      "method": "GET",
+      "url": "{{ _.base_url }}/api/bots/tenant/{{ _.tenant_id }}",
+      "name": "List Bots by Tenant",
+      "body": {},
+      "headers": []
+    },
+    {
+      "_id": "req_interact_bot",
+      "_type": "request",
+      "parentId": "fld_bot",
+      "method": "POST",
+      "url": "{{ _.base_url }}/api/bots/{{ _.bot_id }}/interagir",
+      "name": "Interact with Bot",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\"mensagem\":\"Olá, como posso ajudar?\"}"
+      },
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ]
+    },
+    {
+      "_id": "fld_chat",
+      "_type": "request_group",
+      "parentId": "wrk_conversia",
+      "name": "Chat"
+    },
+    {
+      "_id": "req_interact_chat",
+      "_type": "request",
+      "parentId": "fld_chat",
+      "method": "POST",
+      "url": "{{ _.base_url }}/api/chat/{{ _.bot_id }}?tenantId={{ _.tenant_id }}",
+      "name": "Interact with Chat",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\"mensagem\":\"Qual é o seu nome?\"}"
+      },
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ]
+    },
+    {
+      "_id": "req_list_chat_history",
+      "_type": "request",
+      "parentId": "fld_chat",
+      "method": "GET",
+      "url": "{{ _.base_url }}/api/chat/historico/{{ _.bot_id }}?tenantId={{ _.tenant_id }}",
+      "name": "List Chat History",
+      "body": {},
+      "headers": []
+    }
+  ]
+}

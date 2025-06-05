@@ -1,0 +1,15 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/conversia
+    driver-class-name: org.postgresql.Driver
+    username: postgres
+    password: your_postgres_password
+  jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    hibernate:
+      ddl-auto: none
+    show-sql: false
+  data:
+    mongodb:
+      uri: mongodb://localhost:27017/conversia
+      database: conversia
