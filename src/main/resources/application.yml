@@ -25,9 +25,12 @@ jwt:
   expiration: 86400000
 
 huggingface:
-  api-key: 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
-  model: tiiuae/falcon-7b-instruct
-
+  api-key: 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
+  model: mistralai/Mistral-7B-Instruct-v0.3
+mistral:
+  api:
+    key: ag:59397f79:20250604:untitled-agent:418ddaf8  # D9M5ZARAmKHHsbV6y8xdTEMoBxiBDkXZ
+    model: mistral-medium   # mistral-7b-instruct-v0.1
 logging:
   level:
     com.avs: DEBUG

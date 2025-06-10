@@ -1,50 +1,73 @@
 package com.avs.conversia.chat_service.service;
 
-import java.util.List;
-import java.util.stream.Collectors;
 
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.UUID;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import com.avs.conversia.bot_service.entity.Bot;
 import com.avs.conversia.bot_service.repository.BotRepository;
-import com.avs.conversia.chat_service.dto.ConversaDTO;
-import com.avs.conversia.chat_service.entity.Conversa;
-import com.avs.conversia.chat_service.repository.ConversaRepository;
-
-import dev.langchain4j.chain.ConversationalChain;
+import com.avs.conversia.bot_service.service.BotService;
+import com.avs.conversia.chat_service.dto.ChatRequestDTO;
+import com.avs.conversia.chat_service.entity.ChatMessage;
+import com.avs.conversia.chat_service.entity.ChatSession;
+import com.avs.conversia.chat_service.repository.ChatMessageRepository;
+import com.avs.conversia.chat_service.repository.ChatSessionRepository;
 
 @Service
 public class ChatService {
-    private final BotRepository botRepository;
-    private final ConversaRepository conversaRepository;
-    private final ConversationalChain conversationalChain;
+    private static final Logger logger = LoggerFactory.getLogger(ChatService.class);
 
-    public ChatService(BotRepository botRepository, ConversaRepository conversaRepository, ConversationalChain conversationalChain) {
+    private final BotService botService;
+    private final BotRepository botRepository;
+    private final ChatMessageRepository chatMessageRepository;
+    private final ChatSessionRepository chatSessionRepository;
+
+    public ChatService(BotService botService, BotRepository botRepository,
+                       ChatMessageRepository chatMessageRepository, ChatSessionRepository chatSessionRepository) {
+        this.botService = botService;
         this.botRepository = botRepository;
-        this.conversaRepository = conversaRepository;
-        this.conversationalChain = conversationalChain;
+        this.chatMessageRepository = chatMessageRepository;
+        this.chatSessionRepository = chatSessionRepository;
     }
 
-    public ConversaDTO interagir(Long botId, Long tenantId, String mensagem) {
+    public String interagirComBot(Long botId, ChatRequestDTO request) {
+        logger.info("Processando interação com botId: {}, sessionId: {}", botId, request.getSessionId());
+
+        // Validar se o bot existe
         Bot bot = botRepository.findById(botId)
                 .orElseThrow(() -> new IllegalArgumentException("Bot não encontrado"));
-        if (!bot.getTenant().getId().equals(tenantId)) {
-            throw new SecurityException("Bot não pertence ao tenant informado");
-        }
 
-        String resposta = conversationalChain.execute(mensagem);
+        // Gerenciar sessão
+        String sessionId = request.getSessionId() != null ? request.getSessionId() : UUID.randomUUID().toString();
+        ChatSession chatSession = chatSessionRepository.findBySessionIdAndBotId(sessionId, botId)
+                .orElseGet(() -> ChatSession.builder()
+                        .botId(botId)
+                        .tenantId(bot.getTenant().getId())
+                        .sessionId(sessionId)
+                        .messageIds(new ArrayList<>())
+                        .createdAt(LocalDateTime.now())
+                        .lastUpdatedAt(LocalDateTime.now())
+                        .build());
 
-        Conversa conversa = new Conversa(botId, tenantId, mensagem, resposta);
-        conversa = conversaRepository.save(conversa);
+        // Chamar o BotService para processar a mensagem
+        String resposta = botService.interagirComBot(botId, request.getMessage());
 
-        return new ConversaDTO(conversa.getId(), conversa.getBotId(), conversa.getTenantId(),
-                conversa.getMensagemUsuario(), conversa.getRespostaBot(), conversa.getTimestamp());
-    }
+        // Atualizar a sessão
+        ChatMessage chatMessage = chatMessageRepository.findByBotIdAndTenantId(botId, bot.getTenant().getId())
+                .stream()
+                .filter(msg -> msg.getUserMessage().equals(request.getMessage()) && msg.getBotResponse().equals(resposta))
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException("Mensagem não encontrada após interação"));
+        chatSession.getMessageIds().add(chatMessage.getId());
+        chatSession.setLastUpdatedAt(LocalDateTime.now());
+        chatSessionRepository.save(chatSession);
 
-    public List<ConversaDTO> listarHistorico(Long botId, Long tenantId) {
-        return conversaRepository.findByBotIdAndTenantId(botId, tenantId).stream()
-                .map(c -> new ConversaDTO(c.getId(), c.getBotId(), c.getTenantId(),
-                        c.getMensagemUsuario(), c.getRespostaBot(), c.getTimestamp()))
-                .collect(Collectors.toList());
+        logger.info("Resposta gerada para botId: {}, sessionId: {}", botId, sessionId);
+        return resposta;
     }
 }

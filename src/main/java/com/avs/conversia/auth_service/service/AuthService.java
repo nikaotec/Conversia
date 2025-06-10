@@ -1,9 +1,8 @@
 package com.avs.conversia.auth_service.service;
 
-
 import java.security.Key;
 import java.util.Date;
-import java.util.stream.Collectors;
+import java.util.Set;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -16,7 +15,6 @@ import com.avs.conversia.auth_service.dto.LoginRequest;
 import com.avs.conversia.auth_service.dto.RegisterRequest;
 import com.avs.conversia.auth_service.entity.User;
 import com.avs.conversia.auth_service.repository.UserRepository;
-import com.avs.conversia.tenant_service.entity.Tenant;
 
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
@@ -54,14 +52,14 @@ public class AuthService {
 
         userRepository.save(user);
 
-        String token = generateJwtToken(user);
+        // Como o usuário ainda não tem tenants, enviamos lista vazia
+        String token = generateJwtToken(user.getEmail(), Set.of());
+
         AuthResponse response = new AuthResponse();
         response.setToken(token);
         response.setName(user.getName());
         response.setEmail(user.getEmail());
-        response.setTenantIds(user.getTenants().stream()
-                .map(Tenant::getId)
-                .collect(Collectors.toSet()));
+        response.setTenantIds(Set.of());
 
         return response;
     }
@@ -76,29 +74,29 @@ public class AuthService {
             throw new IllegalArgumentException("Invalid email or password");
         }
 
-        String token = generateJwtToken(user);
+        // Consulta segura para evitar acesso direto a user.getTenants()
+        Set<Long> tenantIds = userRepository.findTenantIdsByEmail(user.getEmail());
+
+        String token = generateJwtToken(user.getEmail(), tenantIds);
+
         AuthResponse response = new AuthResponse();
         response.setToken(token);
         response.setName(user.getName());
         response.setEmail(user.getEmail());
-        response.setTenantIds(user.getTenants().stream()
-                .map(Tenant::getId)
-                .collect(Collectors.toSet()));
+        response.setTenantIds(tenantIds);
 
         return response;
     }
 
-    private String generateJwtToken(User user) {
-    Key key = Keys.hmacShaKeyFor(jwtSecret.getBytes());
-    return Jwts.builder()
-            .setSubject(user.getEmail())
-            .claim("tenantIds", user.getTenants().stream()
-                .map(Tenant::getId)
-                .collect(Collectors.toList()))
-            .setIssuedAt(new Date())
-            .setExpiration(new Date(System.currentTimeMillis() + jwtExpiration))
-            .signWith(key, SignatureAlgorithm.HS256) // 👈 FORÇA HS256
-            .compact();
-}
+    private String generateJwtToken(String email, Set<Long> tenantIds) {
+        Key key = Keys.hmacShaKeyFor(jwtSecret.getBytes());
 
+        return Jwts.builder()
+                .setSubject(email)
+                .claim("tenantIds", tenantIds)
+                .setIssuedAt(new Date())
+                .setExpiration(new Date(System.currentTimeMillis() + jwtExpiration))
+                .signWith(key, SignatureAlgorithm.HS256)
+                .compact();
+    }
 }

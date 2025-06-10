@@ -13,8 +13,8 @@ public class teste {
     //     return "Ola deu tudo certo ";
     // }
 
-    @GetMapping("/home")
-    public String getTeste() {
+    @GetMapping("/")
+    public String redirectToIndex() {
         return "index.html";
     }
     

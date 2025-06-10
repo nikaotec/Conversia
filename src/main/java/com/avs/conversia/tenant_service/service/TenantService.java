@@ -37,9 +37,7 @@ public class TenantService {
         if (tenantRepository.findByCnpj(cnpj).isPresent()) {
             throw new IllegalArgumentException("CNPJ already exists");
         }
-        if (tenantRepository.findByEmail(email).isPresent()) {
-            throw new IllegalArgumentException("Email already exists");
-        }
+        
 
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
