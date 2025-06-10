@@ -1,9 +1,9 @@
 spring:
   datasource:
-    url: jdbc:postgresql://localhost:5432/conversia
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/conversia}
     driver-class-name: org.postgresql.Driver
-    username: postgres
-    password: your_postgres_password
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD}
   jpa:
     database-platform: org.hibernate.dialect.PostgreSQLDialect
     hibernate:
@@ -11,5 +11,11 @@ spring:
     show-sql: false
   data:
     mongodb:
-      uri: mongodb://localhost:27017/conversia
+      uri: ${MONGO_URI:mongodb://localhost:27017/conversia}
       database: conversia
+
+logging:
+  level:
+    com.avs: INFO
+    org.springframework: WARN
+    org.springframework.security: WARN

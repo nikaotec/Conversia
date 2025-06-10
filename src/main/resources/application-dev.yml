@@ -1,19 +1,32 @@
 spring:
   datasource:
-    url: jdbc:h2:mem:conversia;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
-    driver-class-name: org.h2.Driver
-    username: sa
-    password:
+    url: jdbc:postgresql://127.0.0.1:5432/conversia_dev
+    username: conversia_user
+    password: 123456
+    driver-class-name: org.postgresql.Driver
   jpa:
-    database-platform: org.hibernate.dialect.H2Dialect
     hibernate:
-      ddl-auto: update
-    show-sql: true
-  h2:
-    console:
-      enabled: true
-      path: /h2-console
-  data:
-    mongodb:
-      uri: mongodb://localhost:27017/conversia
-      database: conversia
+      ddl-auto: none
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    locations: classpath:db/migration
+
+
+# spring:
+#   datasource:
+#     url: jdbc:h2:file:./data/conversia;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+#     driver-class-name: org.h2.Driver
+#     username: sa
+#     password:
+#   jpa:
+#     database-platform: org.hibernate.dialect.H2Dialect
+#     hibernate:
+#       ddl-auto: none
+#     show-sql: true
+#   h2:
+#     console:
+#       enabled: true
+#       path: /h2-console
+

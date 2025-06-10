@@ -13,7 +13,7 @@ public class teste {
     //     return "Ola deu tudo certo ";
     // }
 
-    @GetMapping("/")
+    @GetMapping("/home")
     public String getTeste() {
         return "index.html";
     }

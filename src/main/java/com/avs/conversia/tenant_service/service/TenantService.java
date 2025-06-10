@@ -1,31 +1,54 @@
 package com.avs.conversia.tenant_service.service;
 
-import java.util.List;
-import java.util.stream.Collectors;
-
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
-import com.avs.conversia.tenant_service.dto.TenantDTO;
+import com.avs.conversia.auth_service.entity.User;
+import com.avs.conversia.auth_service.repository.UserRepository;
 import com.avs.conversia.tenant_service.entity.Tenant;
 import com.avs.conversia.tenant_service.repository.TenantRepository;
 
 @Service
 public class TenantService {
-    private final TenantRepository repository;
+    private static final Logger logger = LoggerFactory.getLogger(TenantService.class);
 
-    public TenantService(TenantRepository repository) {
-        this.repository = repository;
+    private final TenantRepository tenantRepository;
+    private final UserRepository userRepository;
+
+    public TenantService(TenantRepository tenantRepository, UserRepository userRepository) {
+        this.tenantRepository = tenantRepository;
+        this.userRepository = userRepository;
     }
 
-    public TenantDTO salvar(TenantDTO dto) {
-        Tenant tenant = new Tenant(dto.getNome(), dto.getCnpj(), dto.getEmail());
-        tenant = repository.save(tenant);
-        return new TenantDTO(tenant.getId(), tenant.getNome(), tenant.getCnpj(), tenant.getEmail());
+    public Long getUserIdByEmail(String email) {
+        return userRepository.findByEmail(email)
+            .orElseThrow(() -> new RuntimeException("Usuário não encontrado"))
+            .getId();
     }
 
-    public List<TenantDTO> listarTodos() {
-        return repository.findAll().stream()
-                .map(t -> new TenantDTO(t.getId(), t.getNome(), t.getCnpj(), t.getEmail()))
-                .collect(Collectors.toList());
+    @Transactional
+    public Tenant createTenant(Long userId, String name, String cnpj, String email) {
+        logger.info("Creating tenant {} for user {}", name, userId);
+        if (tenantRepository.findByName(name).isPresent()) {
+            throw new IllegalArgumentException("Tenant name already exists");
+        }
+        if (tenantRepository.findByCnpj(cnpj).isPresent()) {
+            throw new IllegalArgumentException("CNPJ already exists");
+        }
+        if (tenantRepository.findByEmail(email).isPresent()) {
+            throw new IllegalArgumentException("Email already exists");
+        }
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        Tenant tenant = new Tenant();
+        tenant.setName(name);
+        tenant.setCnpj(cnpj);
+        tenant.setEmail(email);
+        tenant.setUser(user);
+        return tenantRepository.save(tenant);
     }
 }
