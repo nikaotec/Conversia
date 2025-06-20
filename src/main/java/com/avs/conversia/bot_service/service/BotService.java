@@ -22,11 +22,20 @@ import com.avs.conversia.chat_service.repository.ChatMessageRepository;
 import com.avs.conversia.tenant_service.entity.Tenant;
 import com.avs.conversia.tenant_service.repository.TenantRepository;
 
-import dev.langchain4j.chain.ConversationalChain;
-import dev.langchain4j.data.message.AiMessage;
-import dev.langchain4j.data.message.UserMessage;
-import dev.langchain4j.memory.chat.MessageWindowChatMemory;
+import dev.langchain4j.chain.ConversationalChain; // Will be removed effectively
+import dev.langchain4j.data.embedding.Embedding;
+import dev.langchain4j.data.message.AiMessage; // Will be used for chat history saving
+import dev.langchain4j.data.message.ChatMessage; // Langchain's ChatMessage
+import dev.langchain4j.data.message.SystemMessage; // For potential system instructions
+import dev.langchain4j.data.message.UserMessage; // Will be used for chat history saving
+import dev.langchain4j.data.segment.TextSegment;
+// import dev.langchain4j.memory.chat.MessageWindowChatMemory; // Will be removed effectively
 import dev.langchain4j.model.chat.ChatLanguageModel;
+import dev.langchain4j.model.embedding.EmbeddingModel;
+import dev.langchain4j.store.embedding.EmbeddingMatch;
+import dev.langchain4j.store.embedding.EmbeddingStore;
+
+import java.util.ArrayList; // For constructing message list if needed
 
 @Service
 public class BotService {
@@ -34,21 +43,27 @@ public class BotService {
 
     private final BotRepository botRepository;
     private final TenantRepository tenantRepository;
-    private final ChatMessageRepository chatMessageRepository;
+    private final ChatMessageRepository chatMessageRepository; // Application's ChatMessage
     private final ChatLanguageModelFactory chatLanguageModelFactory;
-    private final ConversationalChain defaultConversationalChain;
+    // private final ConversationalChain defaultConversationalChain; // Removed
+    private final EmbeddingModel embeddingModel;
+    private final EmbeddingStore<TextSegment> embeddingStore; // Specified TextSegment
     private final Map<Long, ChatLanguageModel> chatModelCache = new ConcurrentHashMap<>();
 
     @Autowired
     public BotService(BotRepository botRepository, TenantRepository tenantRepository,
-                     ChatMessageRepository chatMessageRepository,
+                     com.avs.conversia.chat_service.repository.ChatMessageRepository chatMessageRepository, // Fully qualified
                      ChatLanguageModelFactory chatLanguageModelFactory,
-                     ConversationalChain defaultConversationalChain) {
+                     // ConversationalChain defaultConversationalChain, // Removed
+                     EmbeddingModel embeddingModel,
+                     EmbeddingStore<TextSegment> embeddingStore) { // Specified TextSegment
         this.botRepository = botRepository;
         this.tenantRepository = tenantRepository;
         this.chatMessageRepository = chatMessageRepository;
         this.chatLanguageModelFactory = chatLanguageModelFactory;
-        this.defaultConversationalChain = defaultConversationalChain;
+        // this.defaultConversationalChain = defaultConversationalChain; // Removed
+        this.embeddingModel = embeddingModel;
+        this.embeddingStore = embeddingStore;
     }
 
     public BotDTO criarBot(BotDTO dto) {
@@ -88,6 +103,24 @@ public class BotService {
         try {
             logger.info("Interagindo com o bot {} usando o provedor {} e modelo {}", botId, bot.getProvider(), bot.getModelo());
 
+            // Generate embedding for the user's message
+            Embedding embedding = embeddingModel.embed(mensagem).content();
+
+            // Find relevant text segments - increased count and added minScore
+            List<EmbeddingMatch<TextSegment>> relevantSegments = embeddingStore.findRelevant(embedding, 1, 0.7);
+
+            String contextForPrompt = "";
+            if (relevantSegments != null && !relevantSegments.isEmpty() && relevantSegments.get(0).score() >= 0.7) {
+                TextSegment firstMatch = relevantSegments.get(0).embedded();
+                contextForPrompt = "Based on the available information: \n\"" + firstMatch.text() + "\"\n\n";
+                logger.info("Retrieved relevant segment: score={}, text='{}'", relevantSegments.get(0).score(), firstMatch.text());
+            } else {
+                logger.info("No relevant segments found (or score below threshold) for message: '{}'", mensagem);
+            }
+
+            String userQueryWithContext = contextForPrompt + "User question: " + mensagem;
+            logger.info("Prompt for LLM: {}", userQueryWithContext);
+
             // Validar modelo
             if (bot.getModelo() == null || bot.getModelo().trim().isEmpty()) {
                 throw new IllegalArgumentException("Modelo não configurado para o bot: " + botId);
@@ -102,26 +135,30 @@ public class BotService {
                     )
             );
 
-            // Carregar histórico de mensagens do MongoDB
-            List<ChatMessage> historico = chatMessageRepository.findByBotIdAndTenantId(botId, bot.getTenant().getId());
-            MessageWindowChatMemory chatMemory = MessageWindowChatMemory.withMaxMessages(10);
-            historico.forEach(msg -> {
-                chatMemory.add(new UserMessage(msg.getUserMessage()));
-                chatMemory.add(new AiMessage(msg.getBotResponse()));
-            });
+            // Carregar histórico de mensagens do MongoDB - This part is temporarily bypassed for RAG focus
+            // List<com.avs.conversia.chat_service.entity.ChatMessage> historico = chatMessageRepository.findByBotIdAndTenantId(botId, bot.getTenant().getId());
+            // MessageWindowChatMemory chatMemory = MessageWindowChatMemory.withMaxMessages(10);
+            // historico.forEach(msg -> {
+            // chatMemory.add(new UserMessage(msg.getUserMessage()));
+            // chatMemory.add(new AiMessage(msg.getBotResponse()));
+            // });
 
-            // Criar ConversationalChain para a interação
-            ConversationalChain conversationalChain = ConversationalChain.builder()
-                    .chatLanguageModel(chatModel)
-                    .chatMemory(chatMemory)
-                    .build();
+            // Criar ConversationalChain para a interação - Bypassed
+            // ConversationalChain conversationalChain = ConversationalChain.builder()
+            // .chatLanguageModel(chatModel)
+            // .chatMemory(chatMemory)
+            // .build();
 
             // Executar a interação
-            String resposta = conversationalChain.execute(mensagem);
+            // String resposta = conversationalChain.execute(mensagem); // Bypassed
+
+            // Directly use chatModel to generate response with context
+            AiMessage aiResponse = chatModel.generate(userQueryWithContext).content();
+            String resposta = aiResponse.text();
             logger.info("Resposta do bot {}: {}", botId, resposta);
 
             // Salvar a mensagem no MongoDB
-            ChatMessage chatMessage = ChatMessage.builder()
+            com.avs.conversia.chat_service.entity.ChatMessage chatMessage = com.avs.conversia.chat_service.entity.ChatMessage.builder()
                     .botId(botId)
                     .tenantId(bot.getTenant().getId())
                     .userMessage(mensagem)

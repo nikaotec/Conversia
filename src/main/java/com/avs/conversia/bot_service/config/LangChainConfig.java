@@ -9,7 +9,11 @@ import org.springframework.context.annotation.Configuration;
 import dev.langchain4j.chain.ConversationalChain;
 import dev.langchain4j.memory.chat.MessageWindowChatMemory;
 import dev.langchain4j.model.chat.ChatLanguageModel;
+import dev.langchain4j.model.embedding.EmbeddingModel;
 import dev.langchain4j.model.huggingface.HuggingFaceChatModel;
+import dev.langchain4j.model.huggingface.HuggingFaceEmbeddingModel;
+import dev.langchain4j.store.embedding.EmbeddingStore;
+import dev.langchain4j.store.embedding.inmemory.InMemoryEmbeddingStore;
 
 @Configuration
 public class LangChainConfig {
@@ -36,5 +40,19 @@ public class LangChainConfig {
                 .chatLanguageModel(defaultChatLanguageModel)
                 .chatMemory(MessageWindowChatMemory.withMaxMessages(10))
                 .build();
+    }
+
+    @Bean
+    public EmbeddingModel embeddingModel() {
+        return HuggingFaceEmbeddingModel.builder()
+                .accessToken(defaultHuggingFaceApiKey)
+                .modelId("sentence-transformers/all-MiniLM-L6-v2")
+                .timeout(Duration.ofSeconds(60))
+                .build();
+    }
+
+    @Bean
+    public EmbeddingStore embeddingStore(EmbeddingModel embeddingModel) {
+        return InMemoryEmbeddingStore.from(embeddingModel);
     }
 }
